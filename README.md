@@ -70,6 +70,9 @@ mandatory for non-interactive use.
 
 ## GitHub Action
 
+Listed on the [GitHub Marketplace](https://github.com/marketplace/actions/foothold-reading-path)
+as **Foothold reading path**.
+
 Put the reading path in the job summary of every pull request. No token, no write
 permission, nothing to configure:
 
@@ -77,7 +80,7 @@ permission, nothing to configure:
 - uses: actions/checkout@v7
   with:
     fetch-depth: 0        # the churn signal needs real history
-- uses: serdairy/foothold@v0.1.3
+- uses: serdairy/foothold@v0.1.4
   with:
     top: "20"
 ```
@@ -88,7 +91,7 @@ permission, nothing to configure:
 | `command` | `map` | `map`, `docs` or `issues` |
 | `top` | `20` | How many files to report |
 | `output` | `ARCHITECTURE.md` | File written when `command: docs` |
-| `version` | latest | Pin a foothold version, e.g. `0.1.3` |
+| `version` | latest | Pin a foothold version, e.g. `0.1.4` |
 | `summary` | `true` | Write the result to the job summary |
 | `python-version` | `3.12` | Python that runs foothold, independent of the analysed project |
 

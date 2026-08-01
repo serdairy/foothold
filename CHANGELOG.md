@@ -6,6 +6,10 @@ All notable changes are documented here. Format follows
 
 ## [Unreleased]
 
+### Changed
+
+- README points at `serdairy/foothold@v0.1.4` and links the Marketplace listing.
+
 ## [0.1.4]
 
 ### Changed
