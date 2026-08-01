@@ -31,4 +31,4 @@ jobs:
         run: |
           uv run foothold map . --top 10
           uv run foothold issues . --max 5
-          uv run foothold docs . --out /tmp/ARCHITECTURE.md
+          uv run foothold docs . --out "${{ runner.temp }}/ARCHITECTURE.md"

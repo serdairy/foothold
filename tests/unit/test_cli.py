@@ -34,3 +34,12 @@ def test_docs_writes_file(minirepo, tmp_path):
     result = runner.invoke(app, ["docs", str(minirepo), "--out", str(out)])
     assert result.exit_code == 0
     assert out.read_text().startswith("# Architecture")
+
+
+def test_docs_reports_a_bad_output_path_without_a_traceback(minirepo, tmp_path):
+    """CI on Windows caught this: an unwritable --out produced a full stack trace."""
+    out = tmp_path / "no-such-dir" / "ARCHITECTURE.md"
+    result = runner.invoke(app, ["docs", str(minirepo), "--out", str(out)])
+    assert result.exit_code == 1
+    assert "Traceback" not in result.stdout
+    assert not out.exists()
