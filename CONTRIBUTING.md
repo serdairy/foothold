@@ -80,6 +80,13 @@ short discussion up front is cheaper for both of us than a rejected pull request
 Pull requests get an automated review pass for style and obvious defects, then a human
 review. The automated pass is advisory; a maintainer makes the merge decision.
 
+## Releasing
+
+1. `uv run foothold docs . --out ARCHITECTURE.md` — the ranking shifts as git history
+   grows, so the committed document is refreshed here rather than asserted in CI.
+2. Update `CHANGELOG.md`.
+3. Tag `vX.Y.Z` and push the tag. Tags are never moved once pushed.
+
 ## Reporting bugs
 
 Open an issue with the output of `foothold map . --json`, your Python version, and the
