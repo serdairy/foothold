@@ -1,8 +1,8 @@
 # Foothold
 
 [![CI](https://github.com/serdairy/foothold/actions/workflows/ci.yml/badge.svg)](https://github.com/serdairy/foothold/actions/workflows/ci.yml)
-[![PyPI](https://img.shields.io/pypi/v/foothold.svg)](https://pypi.org/project/foothold/)
-[![Python](https://img.shields.io/pypi/pyversions/foothold.svg)](https://pypi.org/project/foothold/)
+[![PyPI](https://img.shields.io/pypi/v/foothold?logo=pypi&logoColor=white)](https://pypi.org/project/foothold/)
+[![Python](https://img.shields.io/pypi/pyversions/foothold?logo=python&logoColor=white)](https://pypi.org/project/foothold/)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Checked with mypy](https://img.shields.io/badge/mypy-strict-blue.svg)](https://mypy-lang.org/)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
