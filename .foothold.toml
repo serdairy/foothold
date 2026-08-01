@@ -1,0 +1,14 @@
+# Foothold's configuration for its own repository.
+[foothold]
+top = 20
+model = "gpt-4o-mini"
+max_input_tokens = 12000
+
+# Weights are deliberately visible: a ranking you cannot interrogate is a ranking
+# you cannot trust. Raise `churn` on a repository with long history, raise
+# `centrality` on a young one.
+[foothold.weights]
+centrality = 0.45
+churn = 0.30
+fan_in = 0.15
+size = 0.10

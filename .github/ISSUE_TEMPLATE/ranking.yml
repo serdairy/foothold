@@ -1,0 +1,17 @@
+name: Bad ranking
+description: The file order or architecture summary was misleading
+labels: [ranking, help wanted]
+body:
+  - type: input
+    id: repo
+    attributes:
+      label: Public repository URL
+    validations: { required: true }
+  - type: textarea
+    id: expected
+    attributes:
+      label: What ranking did you expect, and why?
+      description: >
+        This is the most valuable report we receive. Ranking quality is the product;
+        a concrete disagreement from someone who knows the codebase is how it improves.
+    validations: { required: true }

@@ -1,0 +1,20 @@
+name: Bug report
+description: Something behaves incorrectly
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: Include the output of `foothold map . --json` if you can share it.
+    validations: { required: true }
+  - type: input
+    id: repo
+    attributes:
+      label: Repository you ran it against
+      description: A link is enough if it is public.
+  - type: input
+    id: version
+    attributes:
+      label: foothold --version and Python version
+    validations: { required: true }
