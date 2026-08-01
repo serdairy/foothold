@@ -6,14 +6,34 @@ on:
 
 permissions:
   contents: read
-  id-token: write   # PyPI trusted publishing - no API token in secrets
 
 jobs:
-  publish:
+  build:
     runs-on: ubuntu-latest
-    environment: release
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v3
+        with: { enable-cache: true }
       - run: uv build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    # Publishing is off until PyPI trusted publishing is configured. To turn it on:
+    #   1. pypi.org -> Account -> Publishing -> add a pending publisher for this repo
+    #      and the workflow file release.yml, environment "release"
+    #   2. Settings -> Environments -> New environment -> "release"
+    #   3. Settings -> Secrets and variables -> Actions -> Variables -> PYPI_PUBLISH = true
+    # Until then the tag still produces a build artifact, and the run stays green.
+    if: vars.PYPI_PUBLISH == 'true'
+    needs: build
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      id-token: write   # trusted publishing - no API token in secrets
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { name: dist, path: dist }
       - uses: pypa/gh-action-pypi-publish@release/v1

@@ -26,6 +26,10 @@
 | `src/foothold/collectors/git_history.py` | 0.072 | 1 | 44 | — |
 | `src/foothold/collectors/markers.py` | 0.063 | 1 | 32 | — |
 | `src/foothold/render/__init__.py` | 0.039 | 2 | 6 | — |
+| `src/foothold/collectors/__init__.py` | 0.015 | 1 | 6 | — |
+| `src/foothold/graph/__init__.py` | 0.011 | 1 | 5 | — |
+| `src/foothold/narrator/__init__.py` | 0.003 | 1 | 4 | — |
+| `src/foothold/__init__.py` | 0.000 | 1 | 4 | — |
 
 ## Dependency graph
 
