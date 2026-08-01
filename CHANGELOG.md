@@ -14,6 +14,14 @@ All notable changes are documented here. Format follows
   repository and writes the ranked reading path to the job summary. Composite action, so
   there is no container to pull; it needs no token and no write permission.
 
+### Changed
+
+- Every GitHub Action dependency moved to its current major: checkout v4 to v7,
+  setup-python v5 to v7, setup-uv v3 to v9, upload-artifact v4 to v7,
+  download-artifact v4 to v8. The older majors run on Node 20, which GitHub has
+  deprecated, so every run printed a warning - including runs in repositories that
+  merely use this action.
+
 ## [0.1.2]
 
 ### Fixed

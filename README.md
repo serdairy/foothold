@@ -74,7 +74,7 @@ Put the reading path in the job summary of every pull request. No token, no writ
 permission, nothing to configure:
 
 ```yaml
-- uses: actions/checkout@v4
+- uses: actions/checkout@v7
   with:
     fetch-depth: 0        # the churn signal needs real history
 - uses: serdairy/foothold@v0.1.3
