@@ -93,7 +93,12 @@ def docs_cmd(
             )
         except NarratorError as exc:
             err.print(f"[yellow]{exc} Falling back to the deterministic document.[/yellow]")
-    out.write_text(render_architecture(repo, top=top, narrative=narrative), encoding="utf-8")
+    try:
+        out.write_text(render_architecture(repo, top=top, narrative=narrative), encoding="utf-8")
+    except OSError as exc:
+        # A bad --out path is user error, not a crash: no traceback, just the reason.
+        err.print(f"[red]Cannot write {out}: {exc.strerror}[/red]")
+        raise typer.Exit(1) from exc
     console.print(f"Wrote [bold]{out}[/bold]")
 
 
