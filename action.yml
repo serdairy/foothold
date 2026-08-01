@@ -1,4 +1,4 @@
-name: Foothold
+name: Foothold reading path
 description: Rank the files that hold a Python repository together, and put the reading path in the job summary.
 author: Sergei Petrov
 

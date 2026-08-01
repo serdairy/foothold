@@ -6,6 +6,15 @@ All notable changes are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.1.4]
+
+### Changed
+
+- The action's Marketplace name is now "Foothold reading path". GitHub requires that
+  name to be unique across every action, user and organisation, and the organisation
+  `github.com/FootHold` already holds "Foothold". Nothing else changes: the package is
+  still `foothold` on PyPI and the action is still used as `serdairy/foothold@vX.Y.Z`.
+
 ## [0.1.3]
 
 ### Added
