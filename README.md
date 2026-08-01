@@ -151,7 +151,7 @@ Stated plainly, because the alternative wastes your time:
 
 | Version | Scope | Status |
 |---|---|---|
-| **v0.1** | `map`, `docs`, `issues`, `explain`; Python; 85% coverage | **shipped** |
+| **v0.1** | `map`, `docs`, `issues`, `explain`; Python; 86% coverage | **shipped** |
 | v0.2 | Content-hash cache; incremental re-analysis on diff; `--since` | next |
 | v0.3 | tree-sitter parsers: TypeScript, JavaScript, Go | planned |
 | v0.4 | `tour` with personas; GitHub Action for CI-regenerated docs | planned |
