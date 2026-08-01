@@ -6,6 +6,8 @@ All notable changes are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.1.1]
+
 ### Fixed
 
 - `docs` now reports an unwritable `--out` path as a one-line error instead of a
