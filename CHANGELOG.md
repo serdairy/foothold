@@ -6,6 +6,12 @@ All notable changes are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.1.2]
+
+### Fixed
+
+- `foothold --version` printed a stale number. The version lived in a constant in `__init__.py` that drifted from `pyproject.toml` during the 0.1.1 release. It is now read from package metadata, so the two cannot disagree again.
+
 ## [0.1.1]
 
 ### Fixed
