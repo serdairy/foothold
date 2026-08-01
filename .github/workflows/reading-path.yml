@@ -1,0 +1,23 @@
+name: Reading path
+
+# Dogfooding the action this repository publishes. The job summary of every pull
+# request shows the files that hold the project together, so a reviewer sees what
+# a newcomer would see.
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  map:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # the churn signal needs real history
+      - uses: ./           # the action defined in this repository
+        with:
+          top: "15"

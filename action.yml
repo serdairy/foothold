@@ -1,0 +1,98 @@
+name: Foothold
+description: Rank the files that hold a Python repository together, and put the reading path in the job summary.
+author: Sergei Petrov
+
+branding:
+  icon: map
+  color: green
+
+inputs:
+  path:
+    description: Repository root to analyse.
+    required: false
+    default: "."
+  command:
+    description: "One of: map, docs, issues."
+    required: false
+    default: map
+  top:
+    description: How many files to report.
+    required: false
+    default: "20"
+  output:
+    description: File to write when command is `docs`.
+    required: false
+    default: ARCHITECTURE.md
+  version:
+    description: 'Version of foothold to install, e.g. "0.1.2". Empty installs the latest.'
+    required: false
+    default: ""
+  summary:
+    description: Write the result to the GitHub job summary.
+    required: false
+    default: "true"
+  python-version:
+    description: Python used to run foothold. Independent of the analysed project.
+    required: false
+    default: "3.12"
+
+outputs:
+  result:
+    description: The command output as plain text.
+    value: ${{ steps.run.outputs.result }}
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Python for foothold
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Install foothold
+      shell: bash
+      run: |
+        if [ -n "${{ inputs.version }}" ]; then
+          python -m pip install --quiet "foothold==${{ inputs.version }}"
+        else
+          python -m pip install --quiet foothold
+        fi
+        foothold --version
+
+    - name: Run foothold
+      id: run
+      shell: bash
+      env:
+        # rich wraps to the terminal width; fix it so the summary is stable.
+        COLUMNS: "110"
+      run: |
+        set -euo pipefail
+        case "${{ inputs.command }}" in
+          map)    foothold map    "${{ inputs.path }}" --top "${{ inputs.top }}" | tee /tmp/foothold-out.txt ;;
+          issues) foothold issues "${{ inputs.path }}" --max "${{ inputs.top }}" --markdown | tee /tmp/foothold-out.txt ;;
+          docs)   foothold docs   "${{ inputs.path }}" --out "${{ inputs.output }}" --top "${{ inputs.top }}" | tee /tmp/foothold-out.txt ;;
+          *)      echo "::error::Unknown command '${{ inputs.command }}'. Use map, docs or issues."; exit 1 ;;
+        esac
+        {
+          echo "result<<FOOTHOLD_EOF"
+          cat /tmp/foothold-out.txt
+          echo "FOOTHOLD_EOF"
+        } >> "$GITHUB_OUTPUT"
+
+    - name: Write the job summary
+      if: ${{ inputs.summary == 'true' }}
+      shell: bash
+      run: |
+        {
+          echo "## Foothold"
+          echo
+          if [ "${{ inputs.command }}" = "issues" ]; then
+            cat /tmp/foothold-out.txt
+          else
+            echo '```'
+            cat /tmp/foothold-out.txt
+            echo '```'
+          fi
+          echo
+          echo "_Ranked by import graph and git churn. Checkout needs \`fetch-depth: 0\` for the churn signal._"
+        } >> "$GITHUB_STEP_SUMMARY"

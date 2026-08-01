@@ -6,6 +6,14 @@ All notable changes are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.1.3]
+
+### Added
+
+- A GitHub Action. `uses: serdairy/foothold@v0.1.3` runs the tool against the calling
+  repository and writes the ranked reading path to the job summary. Composite action, so
+  there is no container to pull; it needs no token and no write permission.
+
 ## [0.1.2]
 
 ### Fixed

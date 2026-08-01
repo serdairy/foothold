@@ -68,6 +68,38 @@ Python specifically to avoid pulling ~100 MB of scipy and numpy into a CLI.
 The two commands that cost money print an estimate and require confirmation; `--yes` is
 mandatory for non-interactive use.
 
+## GitHub Action
+
+Put the reading path in the job summary of every pull request. No token, no write
+permission, nothing to configure:
+
+```yaml
+- uses: actions/checkout@v4
+  with:
+    fetch-depth: 0        # the churn signal needs real history
+- uses: serdairy/foothold@v0.1.3
+  with:
+    top: "20"
+```
+
+| Input | Default | What it does |
+|---|---|---|
+| `path` | `.` | Repository root to analyse |
+| `command` | `map` | `map`, `docs` or `issues` |
+| `top` | `20` | How many files to report |
+| `output` | `ARCHITECTURE.md` | File written when `command: docs` |
+| `version` | latest | Pin a foothold version, e.g. `0.1.3` |
+| `summary` | `true` | Write the result to the job summary |
+| `python-version` | `3.12` | Python that runs foothold, independent of the analysed project |
+
+The action exposes the output as `steps.<id>.outputs.result`, so you can post it
+wherever you like. It runs `pip install foothold` and nothing else — no container to
+pull, no code from the analysed repository is executed.
+
+`fetch-depth: 0` matters: a shallow clone has no history, so the churn term collapses to
+zero and the ranking degrades to pure graph structure. It still works, it is just less
+informative.
+
 ## How the ranking works
 
 ```
@@ -151,10 +183,10 @@ Stated plainly, because the alternative wastes your time:
 
 | Version | Scope | Status |
 |---|---|---|
-| **v0.1** | `map`, `docs`, `issues`, `explain`; Python; 86% coverage | **shipped** |
+| **v0.1** | `map`, `docs`, `issues`, `explain`; GitHub Action; Python; 86% coverage | **shipped** |
 | v0.2 | Content-hash cache; incremental re-analysis on diff; `--since` | next |
 | v0.3 | tree-sitter parsers: TypeScript, JavaScript, Go | planned |
-| v0.4 | `tour` with personas; GitHub Action for CI-regenerated docs | planned |
+| v0.4 | `tour` with personas; PR-scoped reading paths | planned |
 | v0.5 | Monorepo support; call-graph edges, not just imports | planned |
 | v1.0 | Stable JSON schema; benchmark suite against hand-written docs | planned |
 
