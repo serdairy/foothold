@@ -30,6 +30,8 @@ All notable changes are documented here. Format follows
 
 ## [0.1.0]
 
+Tagged before PyPI trusted publishing was configured, so this version exists as a git tag only. The first version on PyPI is 0.1.1.
+
 ### Added
 
 - `foothold map` — offline ranking of the files that hold a Python repository together,
