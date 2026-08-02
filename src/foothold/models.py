@@ -34,11 +34,18 @@ class Module:
 
 @dataclass
 class Edge:
-    """A directed import edge between two in-project modules."""
+    """A directed import edge between two in-project modules.
+
+    ``kind`` separates an import that runs when the module is imported from one
+    that does not. ``if TYPE_CHECKING:`` blocks and imports inside a function are
+    exactly how Python projects break a cycle on purpose; counting them as
+    ordinary edges reports the fix as the problem.
+    """
 
     src: str
     dst: str
     lineno: int
+    kind: str = "runtime"
 
 
 @dataclass

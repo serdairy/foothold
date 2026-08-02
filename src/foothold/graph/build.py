@@ -52,8 +52,11 @@ def build_graph(
             continue
         if graph.has_edge(edge.src, dst):
             graph[edge.src][dst]["weight"] += 1
+            # An edge is runtime if any of the statements behind it is.
+            if edge.kind == "runtime":
+                graph[edge.src][dst]["kind"] = "runtime"
         else:
-            graph.add_edge(edge.src, dst, weight=1, lineno=edge.lineno)
+            graph.add_edge(edge.src, dst, weight=1, lineno=edge.lineno, kind=edge.kind)
     return graph
 
 
@@ -83,14 +86,24 @@ def _canonical(cycle: list[str]) -> tuple[str, ...]:
 
 
 def find_cycles(graph: nx.DiGraph, limit: int = 10, scan_limit: int = 10_000) -> list[list[str]]:
-    """Import cycles - the places where a newcomer's mental model breaks first.
+    """Import cycles that actually run - the ones a newcomer can trip over.
+
+    Only edges that execute at import time are considered. ``if TYPE_CHECKING:``
+    blocks and imports inside a function are how a Python project breaks a cycle
+    deliberately; counting them reports the fix as the fault. On highway-env that
+    produced ten cycles, every one of them a false positive.
 
     Sorted shortest first, deterministically: ``simple_cycles`` yields in an order
     that depends on set iteration, so taking the first N gave a different answer
     on every process. A regenerated ARCHITECTURE.md changed for no reason.
     """
+    # A graph built by hand carries no kind; treat those edges as runtime rather
+    # than silently reporting that nothing is cyclic.
+    runtime = graph.edge_subgraph(
+        [(u, v) for u, v, k in graph.edges(data="kind", default="runtime") if k == "runtime"]
+    )
     seen: set[tuple[str, ...]] = set()
-    for index, cycle in enumerate(nx.simple_cycles(graph)):
+    for index, cycle in enumerate(nx.simple_cycles(runtime)):
         seen.add(_canonical(cycle))
         # simple_cycles is exponential in the worst case; a dense import graph
         # would otherwise hang the run rather than report on it.

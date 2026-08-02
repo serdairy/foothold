@@ -6,6 +6,27 @@ All notable changes are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.2.4]
+
+### Fixed
+
+- **Reported cycles that Python projects had deliberately broken.** An import
+  inside `if TYPE_CHECKING:`, inside a function, or inside the
+  `if __name__ == "__main__":` demo block does not run when the module is
+  imported — those are the standard ways to break an import cycle. Foothold
+  counted them as ordinary edges and reported the fix as the fault. highway-env
+  was said to have ten cycles and has none; rich was said to have ten, all of
+  them demo blocks. django still reports ten, and the first checks out by hand:
+  `django/contrib/admin/__init__.py` line 14 imports `admin.options`, and
+  `options.py` line 19 imports back from `django.contrib.admin`.
+
+### Changed
+
+- `Edge` carries a `kind`: `runtime`, `type` or `deferred`. Cycle detection uses
+  runtime edges only. Ranking still counts all of them, because a type-only
+  import is still a file you have to read alongside this one.
+- Cache format `3`.
+
 ## [0.2.3]
 
 Both of these were found by running foothold on highway-env and checking its

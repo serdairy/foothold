@@ -23,7 +23,7 @@ from typing import Any
 
 # Bump when the stored shape or the parser's output changes. Old entries are
 # then ignored rather than misread, because the file name itself carries this.
-CACHE_FORMAT = 2
+CACHE_FORMAT = 3
 
 
 @dataclass(frozen=True)
@@ -35,6 +35,7 @@ class RawImport:
     module: str | None = None
     names: tuple[str, ...] = ()
     plain: bool = False  # `import x` rather than `from x import y`
+    kind: str = "runtime"
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -43,6 +44,7 @@ class RawImport:
             "m": self.module,
             "n": list(self.names),
             "p": self.plain,
+            "k": self.kind,
         }
 
     @staticmethod
@@ -53,6 +55,7 @@ class RawImport:
             module=raw["m"],
             names=tuple(raw["n"]),
             plain=bool(raw["p"]),
+            kind=str(raw.get("k", "runtime")),
         )
 
 

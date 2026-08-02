@@ -8,6 +8,7 @@ reading.
 from __future__ import annotations
 
 import ast
+from collections.abc import Iterator
 from pathlib import Path
 
 from foothold.cache import ParseCache, ParsedFile, RawImport, digest
@@ -60,6 +61,81 @@ def _resolve_relative_raw(current: str, node: RawImport) -> str | None:
     return f"{prefix}.{node.module}" if node.module else prefix
 
 
+def _is_type_checking_test(node: ast.expr) -> bool:
+    """Match ``TYPE_CHECKING`` and ``typing.TYPE_CHECKING`` as an if-condition."""
+    if isinstance(node, ast.Name):
+        return node.id == "TYPE_CHECKING"
+    if isinstance(node, ast.Attribute):
+        return node.attr == "TYPE_CHECKING"
+    return False
+
+
+def _is_main_guard(node: ast.expr) -> bool:
+    """Match ``if __name__ == "__main__":``.
+
+    The demo block at the bottom of a module does not run when the module is
+    imported. rich has one in almost every file, and counting those imports
+    invented ten cycles in a library that has none.
+    """
+    if not isinstance(node, ast.Compare) or len(node.comparators) != 1:
+        return False
+    left, right = node.left, node.comparators[0]
+    return (
+        isinstance(left, ast.Name)
+        and left.id == "__name__"
+        and isinstance(right, ast.Constant)
+        and right.value == "__main__"
+    )
+
+
+def _walk_imports(body: list[ast.stmt], kind: str) -> Iterator[RawImport]:
+    """Yield imports with the context they run in.
+
+    Module level is ``runtime``. A ``if TYPE_CHECKING:`` block never executes, and
+    an import inside a function runs only when that function is called: both are
+    the standard ways to break an import cycle, so neither can be reported as
+    one. The ``if __name__ == "__main__":`` demo block is deferred for the same
+    reason. Class bodies do execute at import time and stay ``runtime``.
+    """
+    for node in body:
+        if isinstance(node, ast.Import):
+            yield RawImport(
+                lineno=node.lineno,
+                names=tuple(alias.name for alias in node.names),
+                plain=True,
+                kind=kind,
+            )
+        elif isinstance(node, ast.ImportFrom):
+            yield RawImport(
+                lineno=node.lineno,
+                level=node.level,
+                module=node.module,
+                names=tuple(alias.name for alias in node.names),
+                kind=kind,
+            )
+        elif isinstance(node, ast.If):
+            inner = kind
+            if kind == "runtime":
+                if _is_type_checking_test(node.test):
+                    inner = "type"
+                elif _is_main_guard(node.test):
+                    inner = "deferred"
+            yield from _walk_imports(node.body, inner)
+            yield from _walk_imports(node.orelse, kind)
+        elif isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
+            yield from _walk_imports(node.body, "deferred")
+        elif isinstance(node, ast.ClassDef):
+            yield from _walk_imports(node.body, kind)
+        elif isinstance(node, ast.Try):
+            for block in (node.body, node.orelse, node.finalbody):
+                yield from _walk_imports(block, kind)
+            for handler in node.handlers:
+                yield from _walk_imports(handler.body, kind)
+        elif isinstance(node, ast.With | ast.AsyncWith | ast.For | ast.AsyncFor | ast.While):
+            yield from _walk_imports(node.body, kind)
+            yield from _walk_imports(getattr(node, "orelse", []), kind)
+
+
 def extract(source: str, filename: str) -> ParsedFile:
     """Parse one file into facts that do not depend on where it lives.
 
@@ -67,25 +143,7 @@ def extract(source: str, filename: str) -> ParsedFile:
     hash of ``source`` alone.
     """
     tree = ast.parse(source, filename=filename)
-    imports: list[RawImport] = []
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            imports.append(
-                RawImport(
-                    lineno=node.lineno,
-                    names=tuple(alias.name for alias in node.names),
-                    plain=True,
-                )
-            )
-        elif isinstance(node, ast.ImportFrom):
-            imports.append(
-                RawImport(
-                    lineno=node.lineno,
-                    level=node.level,
-                    module=node.module,
-                    names=tuple(alias.name for alias in node.names),
-                )
-            )
+    imports = list(_walk_imports(tree.body, "runtime"))
     body = tree.body
     if body and isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant):
         body = body[1:]  # a lone docstring is not code
@@ -104,17 +162,19 @@ def build_records(rel: str, parsed: ParsedFile) -> tuple[Module, list[Edge]]:
     edges: list[Edge] = []
     for imp in parsed.imports:
         if imp.plain:
-            edges.extend(Edge(mod, name, imp.lineno) for name in imp.names)
+            edges.extend(Edge(mod, name, imp.lineno, imp.kind) for name in imp.names)
             continue
         target = _resolve_relative_raw(mod, imp)
         if target is None:
             continue
         if target:
-            edges.append(Edge(mod, target, imp.lineno))
-            edges.extend(Edge(mod, f"{target}.{name}", imp.lineno) for name in imp.names)
+            edges.append(Edge(mod, target, imp.lineno, imp.kind))
+            edges.extend(
+                Edge(mod, f"{target}.{name}", imp.lineno, imp.kind) for name in imp.names
+            )
         else:
             # ``from . import x`` anchored at the repository root
-            edges.extend(Edge(mod, name, imp.lineno) for name in imp.names)
+            edges.extend(Edge(mod, name, imp.lineno, imp.kind) for name in imp.names)
     module = Module(
         path=rel,
         module=mod,
