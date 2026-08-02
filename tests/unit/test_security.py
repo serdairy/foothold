@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import shutil
 import stat
 import subprocess
@@ -101,6 +102,10 @@ def test_since_finds_changes_when_analysing_a_subdirectory(nested_repo):
     assert [s.path for s in focus.changed] == ["pkg/core.py"]
 
 
+@pytest.mark.skipif(
+    os.name == "nt",
+    reason="Windows has no POSIX permission bits; chmod only toggles the read-only flag.",
+)
 def test_the_cache_file_is_not_world_readable(minirepo, tmp_path, monkeypatch):
     monkeypatch.setenv("FOOTHOLD_CACHE_DIR", str(tmp_path / "cache"))
     root = tmp_path / "repo"
