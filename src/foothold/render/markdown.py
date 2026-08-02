@@ -64,7 +64,8 @@ def render_architecture(repo: RepoMap, top: int = 20, narrative: str | None = No
     parts += ["", "## Dependency graph", "", render_mermaid(repo), ""]
     if repo.cycles:
         parts += ["## Import cycles", ""]
-        parts += [f"- {' → '.join(c)}" for c in repo.cycles[:5]]
+        # Close the loop so the arrows read as what they are: A imports B imports A.
+        parts += [f"- {' → '.join([*c, c[0]])}" for c in repo.cycles[:5]]
         parts.append("")
     parts += [
         "## How this file is scored",

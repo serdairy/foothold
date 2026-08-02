@@ -72,3 +72,48 @@ def test_relative_import_from_toplevel_module(tmp_path):
     modules, edges = collect_modules(tmp_path, DEFAULT_EXCLUDES)
     graph = build_graph(modules, edges, root_alias=tmp_path.name)
     assert graph.has_edge("b", "a")
+
+
+def test_cycles_are_the_same_whatever_order_the_graph_was_built_in():
+    """Regression: simple_cycles yields in set-iteration order, so a regenerated
+    ARCHITECTURE.md listed different cycles on every process."""
+    import networkx as nx
+
+    from foothold.graph.build import find_cycles
+
+    forward = nx.DiGraph()
+    forward.add_edges_from([("a", "b"), ("b", "a"), ("c", "d"), ("d", "c"), ("b", "c")])
+    backward = nx.DiGraph()
+    backward.add_edges_from([("d", "c"), ("c", "d"), ("b", "a"), ("a", "b"), ("b", "c")])
+
+    assert find_cycles(forward) == find_cycles(backward)
+
+
+def test_a_reported_cycle_is_a_real_chain_of_imports():
+    """Regression: the nodes used to be sorted alphabetically and printed with
+    arrows between them, so most arrows claimed an import that did not exist."""
+    import networkx as nx
+
+    from foothold.graph.build import find_cycles
+
+    graph = nx.DiGraph()
+    graph.add_edges_from([("zebra", "apple"), ("apple", "moose"), ("moose", "zebra")])
+
+    (cycle,) = find_cycles(graph)
+
+    assert cycle[0] == "apple"  # rotated to the smallest node, direction intact
+    for src, dst in zip(cycle, [*cycle[1:], cycle[0]], strict=True):
+        assert graph.has_edge(src, dst)
+
+
+def test_shorter_cycles_come_first():
+    import networkx as nx
+
+    from foothold.graph.build import find_cycles
+
+    graph = nx.DiGraph()
+    graph.add_edges_from([("a", "b"), ("b", "a"), ("c", "d"), ("d", "e"), ("e", "c")])
+
+    lengths = [len(c) for c in find_cycles(graph)]
+
+    assert lengths == sorted(lengths)

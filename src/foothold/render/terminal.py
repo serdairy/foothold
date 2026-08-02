@@ -45,7 +45,7 @@ def render_map(repo: RepoMap, top: int, console: Console | None = None) -> None:
     if repo.cycles:
         console.print(f"\n[bold yellow]{len(repo.cycles)} import cycle(s)[/bold yellow]")
         for cycle in repo.cycles[:3]:
-            console.print(f"  · {' → '.join(cycle)}")
+            console.print(f"  · {' → '.join([*cycle, cycle[0]])}")
 
 
 def render_focus(repo: RepoMap, focus: Focus, top: int, console: Console | None = None) -> None:

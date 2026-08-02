@@ -24,6 +24,16 @@ All notable changes are documented here. Format follows
 - `docs/` is excluded by default. Sphinx's `conf.py` ranked 14th of 66 files on
   highway-env, and documentation build configuration is not source a newcomer
   should be sent to read.
+- **Reported import cycles were not cycles.** The nodes were sorted
+  alphabetically and then printed with arrows between them, so most arrows
+  claimed an import that does not exist. Cycles now keep their direction,
+  rotated to start at their smallest member, and the output closes the loop:
+  `a → b → a`.
+- **The cycle list changed on every run.** `networkx.simple_cycles` yields in
+  set-iteration order, and taking the first ten gave a different ten per
+  process. On highway-env, regenerating `ARCHITECTURE.md` produced a different
+  document each time for no reason. Cycles are now deduplicated, sorted shortest
+  first, and the scan is bounded so a dense graph cannot hang the run.
 
 ### Changed
 

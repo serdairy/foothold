@@ -69,11 +69,32 @@ def find_entrypoints(graph: nx.DiGraph, modules: dict[str, Module]) -> list[str]
     return sorted(out, key=lambda n: (-modules[n].loc, n))
 
 
-def find_cycles(graph: nx.DiGraph, limit: int = 10) -> list[list[str]]:
-    """Import cycles - the places where a newcomer's mental model breaks first."""
-    cycles: list[list[str]] = []
-    for cycle in nx.simple_cycles(graph):
-        cycles.append(sorted(cycle))
-        if len(cycles) >= limit:
+def _canonical(cycle: list[str]) -> tuple[str, ...]:
+    """Rotate a cycle to start at its smallest node, keeping the direction.
+
+    The same cycle can be discovered from any of its members. Rotating gives one
+    spelling per cycle, which is what makes the output stable. Sorting the nodes
+    would also be stable, and was what this did — but it turned an import chain
+    into an alphabetical list while still printing it with arrows between the
+    entries. Every arrow was then a claim that A imports B, and most were false.
+    """
+    start = cycle.index(min(cycle))
+    return tuple(cycle[start:] + cycle[:start])
+
+
+def find_cycles(graph: nx.DiGraph, limit: int = 10, scan_limit: int = 10_000) -> list[list[str]]:
+    """Import cycles - the places where a newcomer's mental model breaks first.
+
+    Sorted shortest first, deterministically: ``simple_cycles`` yields in an order
+    that depends on set iteration, so taking the first N gave a different answer
+    on every process. A regenerated ARCHITECTURE.md changed for no reason.
+    """
+    seen: set[tuple[str, ...]] = set()
+    for index, cycle in enumerate(nx.simple_cycles(graph)):
+        seen.add(_canonical(cycle))
+        # simple_cycles is exponential in the worst case; a dense import graph
+        # would otherwise hang the run rather than report on it.
+        if index >= scan_limit:
             break
-    return cycles
+    ordered = sorted(seen, key=lambda c: (len(c), c))
+    return [list(c) for c in ordered[:limit]]
