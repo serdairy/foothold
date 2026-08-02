@@ -24,11 +24,31 @@ def render_architecture(repo: RepoMap, top: int = 20, narrative: str | None = No
     ]
     if narrative:
         parts += ["## Overview", "", narrative, ""]
+    # "Where to start" used to list entry points: modules imported by nothing
+    # in-project. On highway-env that meant benchmark scripts and the Sphinx
+    # config — actively misleading under a heading that promises the opposite.
+    # The reading path is the ranking; entry points are a separate, honest thing.
     parts += ["## Where to start", ""]
-    for name in repo.entrypoints[:6]:
-        module = repo.modules[name]
-        summary = (module.docstring or "").strip().splitlines()
-        parts.append(f"- `{module.path}` — {summary[0] if summary else 'no docstring'}")
+    for i, score in enumerate(repo.scores[:5], start=1):
+        module = repo.modules.get(score.module)
+        summary = (module.docstring or "").strip().splitlines() if module else []
+        note = f" — {summary[0]}" if summary else ""
+        parts.append(f"{i}. `{score.path}`{note}")
+    parts.append("")
+    if repo.entrypoints:
+        parts += [
+            "## Entry points",
+            "",
+            "Imported by nothing else in the project: command line entry points, "
+            "scripts and examples.",
+            "",
+        ]
+        for name in repo.entrypoints[:6]:
+            module = repo.modules[name]
+            summary = (module.docstring or "").strip().splitlines()
+            tail = f" — {summary[0]}" if summary else ""
+            parts.append(f"- `{module.path}`{tail}")
+        parts.append("")
     parts += [
         "",
         "## Core modules",

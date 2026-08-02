@@ -16,6 +16,14 @@ All notable changes are documented here. Format follows
   should I read first". Package markers with no statements are now kept in the
   graph and left out of the ranking. One holding only a docstring is still
   ranked — a sentence saying what the package is for is worth reading.
+- `ARCHITECTURE.md` recommended the wrong files. "Where to start" listed entry
+  points — modules nothing else imports — which on highway-env meant benchmark
+  scripts and the Sphinx config, under a heading promising the opposite. That
+  section is now the ranking itself; entry points keep their own heading, which
+  is what they are actually good for.
+- `docs/` is excluded by default. Sphinx's `conf.py` ranked 14th of 66 files on
+  highway-env, and documentation build configuration is not source a newcomer
+  should be sent to read.
 
 ### Changed
 

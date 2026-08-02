@@ -20,6 +20,7 @@ else:  # pragma: no cover - exercised on 3.10 only
 
 DEFAULT_EXCLUDES = (
     ".git",
+    "docs",
     ".venv",
     "venv",
     "node_modules",
