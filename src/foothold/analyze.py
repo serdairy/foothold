@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from foothold.cache import ParseCache
 from foothold.collectors import churn_by_path, collect_markers, collect_modules
 from foothold.config import Config
 from foothold.graph import build_graph, find_cycles, find_entrypoints, rank
@@ -21,9 +22,12 @@ def _untested(modules: dict[str, Module], scores: list[Score]) -> list[str]:
     return out
 
 
-def analyze(root: Path, config: Config | None = None) -> RepoMap:
+def analyze(root: Path, config: Config | None = None, *, use_cache: bool = True) -> RepoMap:
     config = config or Config.load(root)
-    modules, edges = collect_modules(root, config.excludes)
+    cache = ParseCache(root, enabled=use_cache)
+    cache.load()
+    modules, edges = collect_modules(root, config.excludes, cache)
+    cache.save()
     graph = build_graph(modules, edges, root_alias=root.name)
     churn = churn_by_path(root)
     scores = rank(graph, modules, churn, config.weights)

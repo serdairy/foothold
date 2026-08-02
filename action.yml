@@ -27,6 +27,12 @@ inputs:
     description: 'Version of foothold to install, e.g. "0.1.2". Empty installs the latest.'
     required: false
     default: ""
+  since:
+    description: >-
+      Restrict the reading path to files changed since a git ref. Use "auto" to
+      compare against the pull request's base branch.
+    required: false
+    default: ""
   summary:
     description: Write the result to the GitHub job summary.
     required: false
@@ -42,6 +48,13 @@ inputs:
     description: Token used to post the pull request comment.
     required: false
     default: ${{ github.token }}
+  cache:
+    description: >-
+      Restore and save foothold's parse cache between runs. Parsing is most of
+      the cost, so this is the difference between four seconds and half a second
+      on a large repository.
+    required: false
+    default: "true"
   fetch-history:
     description: >-
       Deepen a shallow checkout so the churn signal has commits to read. Set to
@@ -101,6 +114,34 @@ runs:
           echo "::warning title=Shallow checkout::Could not deepen the checkout. Ranking falls back to the import graph alone. Add 'fetch-depth: 0' to actions/checkout to fix this."
         fi
 
+    - name: Restore the parse cache
+      if: ${{ inputs.cache == 'true' }}
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/foothold
+        # Content-addressed entries, so a cache from any earlier commit is still
+        # correct: unchanged files hit, changed files are re-parsed.
+        key: foothold-${{ runner.os }}-${{ inputs.python-version }}-${{ github.sha }}
+        restore-keys: |
+          foothold-${{ runner.os }}-${{ inputs.python-version }}-
+
+    - name: Resolve the diff base
+      id: since
+      shell: bash
+      run: |
+        set -uo pipefail
+        value="${{ inputs.since }}"
+        if [ "$value" = "auto" ]; then
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            value="origin/${{ github.event.pull_request.base.ref }}"
+            git -C "${{ inputs.path }}" fetch --quiet origin "${{ github.event.pull_request.base.ref }}" 2>/dev/null || true
+          else
+            echo "::notice::since=auto only applies to pull requests; showing the whole map."
+            value=""
+          fi
+        fi
+        echo "ref=$value" >> "$GITHUB_OUTPUT"
+
     - name: Run foothold
       id: run
       shell: bash
@@ -112,7 +153,13 @@ runs:
         out="${RUNNER_TEMP}/foothold-out.txt"
         echo "FOOTHOLD_OUT=$out" >> "$GITHUB_ENV"
         case "${{ inputs.command }}" in
-          map)    foothold map    "${{ inputs.path }}" --top "${{ inputs.top }}" | tee "$out" ;;
+          map)
+            if [ -n "${{ steps.since.outputs.ref }}" ]; then
+              foothold map "${{ inputs.path }}" --top "${{ inputs.top }}" --since "${{ steps.since.outputs.ref }}" | tee "$out"
+            else
+              foothold map "${{ inputs.path }}" --top "${{ inputs.top }}" | tee "$out"
+            fi
+            ;;
           issues) foothold issues "${{ inputs.path }}" --max "${{ inputs.top }}" --markdown | tee "$out" ;;
           docs)   foothold docs   "${{ inputs.path }}" --out "${{ inputs.output }}" --top "${{ inputs.top }}" | tee "$out" ;;
           *)      echo "::error::Unknown command '${{ inputs.command }}'. Use map, docs or issues."; exit 1 ;;

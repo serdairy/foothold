@@ -6,6 +6,30 @@ All notable changes are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.2.0]
+
+### Added
+
+- A content-addressed parse cache. Everything `ast.parse` yields is a pure function
+  of a file's bytes, so it is keyed by their SHA-256 and reused until they change.
+  On django this takes a run from 3.5s to 0.40s; on rich, 0.32s to 0.06s. The cache
+  lives in `~/.cache/foothold`, never inside the analysed repository. Only
+  path-independent facts are stored, so a renamed file cannot carry a stale answer
+  with it. `foothold cache` shows it, `foothold cache --clear` empties it,
+  `--no-cache` skips it.
+- `foothold map --since <ref>`: the reading path for a diff. Changed files ranked by
+  the usual weight, then everything that imports them, in reading order. Changed
+  test files are listed separately rather than lumped in with deleted ones, because
+  ranking excludes tests by design.
+- Action inputs `since` (use `auto` for the pull request's base branch) and `cache`,
+  which restores and saves the parse cache between runs via `actions/cache`.
+
+### Changed
+
+- `analyze()` takes `use_cache`; `collect_modules()` takes an optional cache.
+  Parsing is split into `extract()`, which depends only on the file's bytes, and
+  `build_records()`, which applies everything derived from the path.
+
 ## [0.1.5]
 
 ### Added

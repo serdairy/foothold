@@ -41,3 +41,24 @@ def churn_by_path(root: Path, since: str = "18.months") -> dict[str, int]:
         if line.endswith(".py"):
             counts[line] += 1
     return dict(counts)
+
+
+def changed_paths(root: Path, ref: str) -> set[str] | None:
+    """Return Python files that differ from ``ref``, or None if ref is unusable.
+
+    None and the empty set mean different things: the first is "I could not ask
+    git", the second is "nothing changed". Callers must not conflate them.
+    """
+    try:
+        proc = subprocess.run(
+            ["git", "-C", str(root), "diff", "--name-only", ref, "--"],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if proc.returncode != 0:
+        return None
+    return {line.strip() for line in proc.stdout.splitlines() if line.strip().endswith(".py")}

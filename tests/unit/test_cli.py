@@ -44,3 +44,38 @@ def test_docs_reports_a_bad_output_path_without_a_traceback(minirepo, tmp_path):
     assert result.exit_code == 1
     assert "Traceback" not in result.stdout
     assert not out.exists()
+
+
+def test_map_since_reports_a_bad_ref_without_a_traceback(tmp_path, minirepo):
+    import shutil
+
+    root = tmp_path / "minirepo"
+    shutil.copytree(minirepo, root)
+
+    result = runner.invoke(app, ["map", str(root), "--since", "nope"])
+
+    assert result.exit_code == 1
+    assert "Cannot diff against" in result.output
+    assert "Traceback" not in result.output
+
+
+def test_cache_command_prints_the_directory(tmp_path, monkeypatch):
+    monkeypatch.setenv("FOOTHOLD_CACHE_DIR", str(tmp_path / "cache"))
+
+    result = runner.invoke(app, ["cache"])
+
+    assert result.exit_code == 0
+    assert "0 file(s)" in result.output
+
+
+def test_cache_clear_removes_the_files(tmp_path, minirepo, monkeypatch):
+    import shutil
+
+    monkeypatch.setenv("FOOTHOLD_CACHE_DIR", str(tmp_path / "cache"))
+    root = tmp_path / "minirepo"
+    shutil.copytree(minirepo, root)
+    runner.invoke(app, ["map", str(root)])
+
+    result = runner.invoke(app, ["cache", "--clear"])
+
+    assert "Removed 1 cache file(s)" in result.output

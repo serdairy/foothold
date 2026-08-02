@@ -10,6 +10,7 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
+from foothold.cache import ParseCache, ParsedFile, RawImport, digest
 from foothold.models import Edge, Module
 
 TEST_HINTS = ("tests/", "test_", "_test.py", "conftest.py")
@@ -46,7 +47,7 @@ def _public_defs(tree: ast.Module) -> tuple[str, ...]:
     return tuple(out)
 
 
-def _resolve_relative(current: str, node: ast.ImportFrom) -> str | None:
+def _resolve_relative_raw(current: str, node: RawImport) -> str | None:
     """Turn ``from ..graph import build`` inside ``a.b.c`` into ``a.graph.build``."""
     if node.level == 0:
         return node.module
@@ -59,38 +60,81 @@ def _resolve_relative(current: str, node: ast.ImportFrom) -> str | None:
     return f"{prefix}.{node.module}" if node.module else prefix
 
 
-def parse_file(root: Path, rel: str) -> tuple[Module, list[Edge]]:
-    source = (root / rel).read_text(encoding="utf-8", errors="replace")
-    tree = ast.parse(source, filename=rel)
-    mod = module_name(rel)
-    edges: list[Edge] = []
+def extract(source: str, filename: str) -> ParsedFile:
+    """Parse one file into facts that do not depend on where it lives.
+
+    Kept separate from :func:`build_records` so the result can be cached by the
+    hash of ``source`` alone.
+    """
+    tree = ast.parse(source, filename=filename)
+    imports: list[RawImport] = []
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
-            edges.extend(Edge(mod, alias.name, node.lineno) for alias in node.names)
+            imports.append(
+                RawImport(
+                    lineno=node.lineno,
+                    names=tuple(alias.name for alias in node.names),
+                    plain=True,
+                )
+            )
         elif isinstance(node, ast.ImportFrom):
-            target = _resolve_relative(mod, node)
-            if target is None:
-                continue
-            if target:
-                edges.append(Edge(mod, target, node.lineno))
-                edges.extend(Edge(mod, f"{target}.{a.name}", node.lineno) for a in node.names)
-            else:
-                # ``from . import x`` anchored at the repository root
-                edges.extend(Edge(mod, a.name, node.lineno) for a in node.names)
+            imports.append(
+                RawImport(
+                    lineno=node.lineno,
+                    level=node.level,
+                    module=node.module,
+                    names=tuple(alias.name for alias in node.names),
+                )
+            )
+    return ParsedFile(
+        loc=source.count("\n") + 1,
+        defines=_public_defs(tree),
+        docstring=ast.get_docstring(tree),
+        imports=tuple(imports),
+    )
+
+
+def build_records(rel: str, parsed: ParsedFile) -> tuple[Module, list[Edge]]:
+    """Apply everything that depends on the file's path to a parsed file."""
+    mod = module_name(rel)
+    edges: list[Edge] = []
+    for imp in parsed.imports:
+        if imp.plain:
+            edges.extend(Edge(mod, name, imp.lineno) for name in imp.names)
+            continue
+        target = _resolve_relative_raw(mod, imp)
+        if target is None:
+            continue
+        if target:
+            edges.append(Edge(mod, target, imp.lineno))
+            edges.extend(Edge(mod, f"{target}.{name}", imp.lineno) for name in imp.names)
+        else:
+            # ``from . import x`` anchored at the repository root
+            edges.extend(Edge(mod, name, imp.lineno) for name in imp.names)
     module = Module(
         path=rel,
         module=mod,
-        loc=source.count("\n") + 1,
+        loc=parsed.loc,
         is_test=_is_test(rel),
         is_package_init=Path(rel).name == "__init__.py",
-        defines=_public_defs(tree),
-        docstring=ast.get_docstring(tree),
+        defines=parsed.defines,
+        docstring=parsed.docstring,
     )
     return module, edges
 
 
-def collect_modules(root: Path, excludes: tuple[str, ...]) -> tuple[dict[str, Module], list[Edge]]:
+def parse_file(root: Path, rel: str) -> tuple[Module, list[Edge]]:
+    source = (root / rel).read_text(encoding="utf-8", errors="replace")
+    return build_records(rel, extract(source, rel))
+
+
+def collect_modules(
+    root: Path,
+    excludes: tuple[str, ...],
+    cache: ParseCache | None = None,
+) -> tuple[dict[str, Module], list[Edge]]:
     """Walk the tree once, returning modules keyed by dotted name and raw edges."""
+    cache = cache or ParseCache(root, enabled=False)
     modules: dict[str, Module] = {}
     edges: list[Edge] = []
     for file in sorted(root.rglob("*.py")):
@@ -98,9 +142,18 @@ def collect_modules(root: Path, excludes: tuple[str, ...]) -> tuple[dict[str, Mo
         if any(part in excludes for part in Path(rel).parts):
             continue
         try:
-            module, file_edges = parse_file(root, rel)
-        except (SyntaxError, UnicodeDecodeError, ValueError):
+            raw = file.read_bytes()
+        except OSError:
             continue
+        key = digest(raw)
+        parsed = cache.get(key)
+        if parsed is None:
+            try:
+                parsed = extract(raw.decode("utf-8", errors="replace"), rel)
+            except (SyntaxError, UnicodeDecodeError, ValueError):
+                continue
+            cache.put(key, parsed)
+        module, file_edges = build_records(rel, parsed)
         if not module.module:
             continue
         modules[module.module] = module

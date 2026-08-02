@@ -42,7 +42,7 @@ Or in CI, where every pull request gets the reading path as a comment:
 - uses: actions/checkout@v7
   with:
     fetch-depth: 0          # the churn signal needs real history
-- uses: serdairy/foothold@v0.1.5
+- uses: serdairy/foothold@v0.2.0
   with:
     comment: "true"         # needs permissions: pull-requests: write
 ```
@@ -101,7 +101,7 @@ permission:
 - uses: actions/checkout@v7
   with:
     fetch-depth: 0        # the churn signal needs real history
-- uses: serdairy/foothold@v0.1.5
+- uses: serdairy/foothold@v0.2.0
   with:
     top: "20"
 ```
@@ -115,7 +115,7 @@ permissions:
   pull-requests: write
 
 # ...
-      - uses: serdairy/foothold@v0.1.5
+      - uses: serdairy/foothold@v0.2.0
         with:
           comment: "true"
 ```
@@ -126,9 +126,11 @@ permissions:
 | `command` | `map` | `map`, `docs` or `issues` |
 | `top` | `20` | How many files to report |
 | `output` | `ARCHITECTURE.md` | File written when `command: docs` |
-| `version` | latest | Pin a foothold version, e.g. `0.1.5` |
+| `version` | latest | Pin a foothold version, e.g. `0.2.0` |
 | `summary` | `true` | Write the result to the job summary |
+| `since` | — | Scope to files changed since a ref; `auto` uses the PR base branch |
 | `comment` | `false` | Post the result as one pull request comment, edited in place |
+| `cache` | `true` | Restore and save the parse cache between runs |
 | `github-token` | `github.token` | Token used for that comment |
 | `fetch-history` | `true` | Deepen a shallow checkout so churn has commits to read |
 | `python-version` | `3.12` | Python that runs foothold, independent of the analysed project |
@@ -146,6 +148,42 @@ never spot.
 On pull requests from forks GitHub issues a read-only token, so the comment cannot be
 posted. The action warns and leaves the result in the job summary rather than failing
 the job.
+
+## Reviewing a change
+
+`--since` asks a different question from `map`. Instead of "where is the centre of
+this project", it answers "what did this diff touch, and what else has to be read
+because of it":
+
+```console
+$ foothold map . --since main
+4 changed source file(s) · 8 file(s) importing them · 4 changed test file(s)
+```
+
+Changed files are ranked by the same weight as the full map, and the second table
+lists everything that imports them, in the order worth reading. Changed tests are
+listed separately rather than reported as unranked, because ranking excludes tests
+by design. In the action, `since: auto` resolves to the pull request's base branch.
+
+## Speed and the cache
+
+Parsing is almost all of the cost: on django, 3.6s of a 4.0s run. Foothold caches
+what parsing yields, keyed by the SHA-256 of the file's bytes.
+
+| Repository | Modules | First run | Cached run |
+|---|---|---|---|
+| rich | 213 | 0.32s | 0.06s |
+| django | 2,920 | 3.5s | 0.40s |
+
+The cache lives in `~/.cache/foothold` (or `$XDG_CACHE_HOME`, or
+`$FOOTHOLD_CACHE_DIR`), never inside the repository being read, so it cannot show
+up in someone else's `git status`. Only path-independent facts are stored — line
+count, public definitions, docstring, raw import statements. Anything derived from
+where the file lives is recomputed every run, so a moved or renamed file cannot
+carry a stale answer with it.
+
+`foothold cache` prints the location and size; `foothold cache --clear` empties it;
+`--no-cache` skips it for one run.
 
 ## How the ranking works
 
@@ -230,9 +268,9 @@ Stated plainly, because the alternative wastes your time:
 
 | Version | Scope | Status |
 |---|---|---|
-| **v0.1** | `map`, `docs`, `issues`, `explain`; GitHub Action; Python; 86% coverage | **shipped** |
-| v0.2 | Content-hash cache; incremental re-analysis on diff; `--since` | next |
-| v0.3 | tree-sitter parsers: TypeScript, JavaScript, Go | planned |
+| **v0.1** | `map`, `docs`, `issues`, `explain`; GitHub Action; Python | **shipped** |
+| **v0.2** | Content-hash cache; `--since` diff scope; PR comments | **shipped** |
+| v0.3 | tree-sitter parsers: TypeScript, JavaScript, Go | next |
 | v0.4 | `tour` with personas; PR-scoped reading paths | planned |
 | v0.5 | Monorepo support; call-graph edges, not just imports | planned |
 | v1.0 | Stable JSON schema; benchmark suite against hand-written docs | planned |
