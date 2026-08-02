@@ -6,9 +6,25 @@ All notable changes are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.1.5]
+
+### Added
+
+- `comment: "true"` posts the reading path as a pull request comment and edits that
+  same comment on later pushes, instead of leaving it in a job summary that nobody
+  opens. Needs `permissions: pull-requests: write`; on fork pull requests the token is
+  read-only, so the action warns and falls back to the summary rather than failing.
+- `fetch-history` (default `true`). `actions/checkout` clones at depth 1, which leaves
+  `git log` empty, the churn term at zero, and the ranking silently reduced to a plain
+  import graph. The action now detects a shallow checkout, deepens it, and warns when
+  it cannot.
+
 ### Changed
 
-- README points at `serdairy/foothold@v0.1.4` and links the Marketplace listing.
+- Temporary files use `RUNNER_TEMP` instead of a hardcoded `/tmp`, so the action
+  behaves on Windows runners.
+- README leads with a copy-pasteable workflow snippet instead of burying it seventy
+  lines down, and links the Marketplace listing.
 
 ## [0.1.4]
 

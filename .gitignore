@@ -10,3 +10,6 @@ build/
 .coverage
 coverage.xml
 .foothold-cache/
+
+# macOS Finder leaves these in every directory it opens.
+.DS_Store

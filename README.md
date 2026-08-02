@@ -30,6 +30,27 @@ Top 6 files by structural weight
 That ordering is not a guess. It falls out of the import graph, weighted by how often each
 file has been edited.
 
+Two ways to run it. On your machine:
+
+```console
+uv tool install foothold && foothold map .
+```
+
+Or in CI, where every pull request gets the reading path as a comment:
+
+```yaml
+- uses: actions/checkout@v7
+  with:
+    fetch-depth: 0          # the churn signal needs real history
+- uses: serdairy/foothold@v0.1.5
+  with:
+    comment: "true"         # needs permissions: pull-requests: write
+```
+
+Full reference in [GitHub Action](#github-action) below; the listing is
+[Foothold reading path](https://github.com/marketplace/actions/foothold-reading-path)
+on the Marketplace.
+
 ## The problem
 
 Contributor onboarding is the most expensive unpaid work in open source, and it is paid
@@ -73,16 +94,30 @@ mandatory for non-interactive use.
 Listed on the [GitHub Marketplace](https://github.com/marketplace/actions/foothold-reading-path)
 as **Foothold reading path**.
 
-Put the reading path in the job summary of every pull request. No token, no write
-permission, nothing to configure:
+The minimum that does something useful — job summary only, no token, no write
+permission:
 
 ```yaml
 - uses: actions/checkout@v7
   with:
     fetch-depth: 0        # the churn signal needs real history
-- uses: serdairy/foothold@v0.1.4
+- uses: serdairy/foothold@v0.1.5
   with:
     top: "20"
+```
+
+Job summaries are easy to miss, so `comment: "true"` puts the result where reviewers
+already look. It posts one comment and edits that same comment on later pushes:
+
+```yaml
+permissions:
+  contents: read
+  pull-requests: write
+
+# ...
+      - uses: serdairy/foothold@v0.1.5
+        with:
+          comment: "true"
 ```
 
 | Input | Default | What it does |
@@ -91,8 +126,11 @@ permission, nothing to configure:
 | `command` | `map` | `map`, `docs` or `issues` |
 | `top` | `20` | How many files to report |
 | `output` | `ARCHITECTURE.md` | File written when `command: docs` |
-| `version` | latest | Pin a foothold version, e.g. `0.1.4` |
+| `version` | latest | Pin a foothold version, e.g. `0.1.5` |
 | `summary` | `true` | Write the result to the job summary |
+| `comment` | `false` | Post the result as one pull request comment, edited in place |
+| `github-token` | `github.token` | Token used for that comment |
+| `fetch-history` | `true` | Deepen a shallow checkout so churn has commits to read |
 | `python-version` | `3.12` | Python that runs foothold, independent of the analysed project |
 
 The action exposes the output as `steps.<id>.outputs.result`, so you can post it
@@ -101,7 +139,13 @@ pull, no code from the analysed repository is executed.
 
 `fetch-depth: 0` matters: a shallow clone has no history, so the churn term collapses to
 zero and the ranking degrades to pure graph structure. It still works, it is just less
-informative.
+informative. If you forget it the action notices, deepens the checkout itself, and warns
+in the log when it cannot — a quietly worse ranking is the one failure mode you would
+never spot.
+
+On pull requests from forks GitHub issues a read-only token, so the comment cannot be
+posted. The action warns and leaves the result in the job summary rather than failing
+the job.
 
 ## How the ranking works
 

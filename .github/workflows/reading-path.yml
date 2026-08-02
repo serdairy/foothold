@@ -1,8 +1,8 @@
 name: Reading path
 
-# Dogfooding the action this repository publishes. The job summary of every pull
-# request shows the files that hold the project together, so a reviewer sees what
-# a newcomer would see.
+# Dogfooding the action this repository publishes. Every pull request gets the
+# files that hold the project together, both in the job summary and as a comment,
+# so a reviewer sees exactly what a newcomer would see.
 
 on:
   pull_request:
@@ -10,6 +10,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: write   # the action edits one comment in place
 
 jobs:
   map:
@@ -21,3 +22,4 @@ jobs:
       - uses: ./           # the action defined in this repository
         with:
           top: "15"
+          comment: "true"

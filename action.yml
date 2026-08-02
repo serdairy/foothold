@@ -31,6 +31,23 @@ inputs:
     description: Write the result to the GitHub job summary.
     required: false
     default: "true"
+  comment:
+    description: >-
+      Post the result as a single comment on the pull request, edited in place on
+      later pushes. Needs `permissions: pull-requests: write`. Ignored outside
+      pull requests.
+    required: false
+    default: "false"
+  github-token:
+    description: Token used to post the pull request comment.
+    required: false
+    default: ${{ github.token }}
+  fetch-history:
+    description: >-
+      Deepen a shallow checkout so the churn signal has commits to read. Set to
+      "false" on very large repositories where the extra fetch is not worth it.
+    required: false
+    default: "true"
   python-version:
     description: Python used to run foothold. Independent of the analysed project.
     required: false
@@ -59,6 +76,31 @@ runs:
         fi
         foothold --version
 
+    # actions/checkout clones at depth 1 by default. With no history `git log`
+    # returns nothing, the churn signal is uniformly zero, and the ranking quietly
+    # degrades to a plain import graph. Say so out loud rather than returning a
+    # worse answer that looks like a normal one.
+    - name: Make sure the churn signal has history
+      shell: bash
+      run: |
+        set -uo pipefail
+        dir="${{ inputs.path }}"
+        if ! git -C "$dir" rev-parse --git-dir >/dev/null 2>&1; then
+          echo "::warning title=No git history::'$dir' is not a git repository. Files will be ranked by the import graph alone."
+          exit 0
+        fi
+        if [ "$(git -C "$dir" rev-parse --is-shallow-repository)" != "true" ]; then
+          exit 0
+        fi
+        if [ "${{ inputs.fetch-history }}" != "true" ]; then
+          echo "::warning title=Shallow checkout::History was not fetched, so the churn signal is empty and ranking falls back to the import graph alone."
+          exit 0
+        fi
+        echo "Shallow checkout detected; deepening it so the churn signal has commits to read."
+        if ! git -C "$dir" fetch --unshallow --quiet 2>/dev/null; then
+          echo "::warning title=Shallow checkout::Could not deepen the checkout. Ranking falls back to the import graph alone. Add 'fetch-depth: 0' to actions/checkout to fix this."
+        fi
+
     - name: Run foothold
       id: run
       shell: bash
@@ -67,15 +109,17 @@ runs:
         COLUMNS: "110"
       run: |
         set -euo pipefail
+        out="${RUNNER_TEMP}/foothold-out.txt"
+        echo "FOOTHOLD_OUT=$out" >> "$GITHUB_ENV"
         case "${{ inputs.command }}" in
-          map)    foothold map    "${{ inputs.path }}" --top "${{ inputs.top }}" | tee /tmp/foothold-out.txt ;;
-          issues) foothold issues "${{ inputs.path }}" --max "${{ inputs.top }}" --markdown | tee /tmp/foothold-out.txt ;;
-          docs)   foothold docs   "${{ inputs.path }}" --out "${{ inputs.output }}" --top "${{ inputs.top }}" | tee /tmp/foothold-out.txt ;;
+          map)    foothold map    "${{ inputs.path }}" --top "${{ inputs.top }}" | tee "$out" ;;
+          issues) foothold issues "${{ inputs.path }}" --max "${{ inputs.top }}" --markdown | tee "$out" ;;
+          docs)   foothold docs   "${{ inputs.path }}" --out "${{ inputs.output }}" --top "${{ inputs.top }}" | tee "$out" ;;
           *)      echo "::error::Unknown command '${{ inputs.command }}'. Use map, docs or issues."; exit 1 ;;
         esac
         {
           echo "result<<FOOTHOLD_EOF"
-          cat /tmp/foothold-out.txt
+          cat "$out"
           echo "FOOTHOLD_EOF"
         } >> "$GITHUB_OUTPUT"
 
@@ -87,12 +131,51 @@ runs:
           echo "## Foothold"
           echo
           if [ "${{ inputs.command }}" = "issues" ]; then
-            cat /tmp/foothold-out.txt
+            cat "$FOOTHOLD_OUT"
           else
             echo '```'
-            cat /tmp/foothold-out.txt
+            cat "$FOOTHOLD_OUT"
             echo '```'
           fi
           echo
           echo "_Ranked by import graph and git churn. Checkout needs \`fetch-depth: 0\` for the churn signal._"
         } >> "$GITHUB_STEP_SUMMARY"
+
+    # One comment, edited in place. A bot that appends a new comment on every push
+    # is the reason maintainers switch bots off.
+    - name: Comment on the pull request
+      if: ${{ inputs.comment == 'true' && github.event_name == 'pull_request' }}
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        REPO: ${{ github.repository }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+      run: |
+        set -uo pipefail
+        marker='<!-- foothold-reading-path -->'
+        body="${RUNNER_TEMP}/foothold-comment.md"
+        {
+          echo "$marker"
+          echo "## Foothold reading path"
+          echo
+          if [ "${{ inputs.command }}" = "issues" ]; then
+            cat "$FOOTHOLD_OUT"
+          else
+            echo '```'
+            cat "$FOOTHOLD_OUT"
+            echo '```'
+          fi
+          echo
+          echo "_Ranked by import graph and git churn._"
+        } > "$body"
+
+        existing=$(gh api "repos/$REPO/issues/$PR_NUMBER/comments" --paginate \
+          --jq ".[] | select(.body | startswith(\"$marker\")) | .id" 2>/dev/null | head -1)
+
+        if [ -n "${existing:-}" ]; then
+          gh api -X PATCH "repos/$REPO/issues/comments/$existing" -F body=@"$body" >/dev/null \
+            || echo "::warning title=Comment not updated::Could not edit the existing comment. The result is still in the job summary."
+        else
+          gh api -X POST "repos/$REPO/issues/$PR_NUMBER/comments" -F body=@"$body" >/dev/null \
+            || echo "::warning title=Comment not posted::Could not post a comment. Pull requests from forks get a read-only token; for same-repository pull requests add 'permissions: pull-requests: write'. The result is still in the job summary."
+        fi
