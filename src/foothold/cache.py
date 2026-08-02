@@ -168,6 +168,9 @@ class ParseCache:
             self.path.parent.mkdir(parents=True, exist_ok=True)
             tmp = self.path.with_suffix(".tmp")
             tmp.write_text(json.dumps(payload, separators=(",", ":")), encoding="utf-8")
+            # Docstrings of private code end up in here; on a shared machine the
+            # default umask would leave them world-readable.
+            tmp.chmod(0o600)
             tmp.replace(self.path)
         except OSError:
             # A cache that cannot be written is a slow run, not a failed one.

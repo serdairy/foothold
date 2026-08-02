@@ -6,6 +6,41 @@ All notable changes are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.2.1]
+
+Findings from an audit of 0.2.0 against hostile and awkward repositories. Two of
+these produced a quietly wrong answer, which is worse than an error.
+
+### Fixed
+
+- **Analysing a subdirectory lost the churn signal entirely.** `git log` and
+  `git diff` return paths relative to the repository root, while scores are keyed
+  relative to the directory being analysed. On django, `foothold map django/`
+  ranked 906 files with churn on none of them — 30% of the ranking weight, gone,
+  with no warning. Both commands now pass `--relative`.
+- **`--since` reported an empty diff for the same reason** when pointed at a
+  subdirectory. It now finds the changed files.
+- **A ref beginning with a dash was parsed by git as an option.**
+  `--since=--output=/tmp/x` made `git diff` write a file at a path of the caller's
+  choosing. Refs are now rejected if they start with `-`, and verified with
+  `git rev-parse` before use. There was never a shell involved; argv has always
+  been explicit.
+- **Symlinks pointing outside the repository were followed.** The contents of an
+  unrelated file could reach the map, the cache, `ARCHITECTURE.md` and, with the
+  action's `comment` input, a public pull request comment. Files that resolve
+  outside the analysed root are now skipped; symlinks within it still work.
+- The cache file is written `0600`. It holds docstrings of whatever was analysed,
+  and the default umask left it world-readable on a shared machine.
+
+### Changed
+
+- The action no longer expands `${{ }}` inside any `run:` block; every value
+  arrives through `env:` and is quoted. GitHub substitutes those expressions into
+  the script text before bash sees them, so a value carrying shell metacharacters
+  would run as code on the runner.
+- Pull request comments are truncated at 60,000 characters with a visible note.
+  GitHub rejects anything over 65,536, and the result was no comment at all.
+
 ## [0.2.0]
 
 ### Added

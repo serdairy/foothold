@@ -137,13 +137,20 @@ def collect_modules(
     cache = cache or ParseCache(root, enabled=False)
     modules: dict[str, Module] = {}
     edges: list[Edge] = []
+    resolved_root = root.resolve()
     for file in sorted(root.rglob("*.py")):
         rel = file.relative_to(root).as_posix()
         if any(part in excludes for part in Path(rel).parts):
             continue
+        # A symlink pointing outside the repository is not part of the repository.
+        # Following one would put the contents of an unrelated file into the map,
+        # the cache, ARCHITECTURE.md and — with the action's `comment` input — a
+        # public pull request comment.
         try:
+            if not file.resolve().is_relative_to(resolved_root):
+                continue
             raw = file.read_bytes()
-        except OSError:
+        except (OSError, RuntimeError):
             continue
         key = digest(raw)
         parsed = cache.get(key)

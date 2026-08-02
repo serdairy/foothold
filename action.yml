@@ -81,9 +81,12 @@ runs:
 
     - name: Install foothold
       shell: bash
+      env:
+        VERSION: ${{ inputs.version }}
       run: |
-        if [ -n "${{ inputs.version }}" ]; then
-          python -m pip install --quiet "foothold==${{ inputs.version }}"
+        set -euo pipefail
+        if [ -n "$VERSION" ]; then
+          python -m pip install --quiet "foothold==$VERSION"
         else
           python -m pip install --quiet foothold
         fi
@@ -95,9 +98,12 @@ runs:
     # worse answer that looks like a normal one.
     - name: Make sure the churn signal has history
       shell: bash
+      env:
+        REPO_PATH: ${{ inputs.path }}
+        FETCH_HISTORY: ${{ inputs.fetch-history }}
       run: |
         set -uo pipefail
-        dir="${{ inputs.path }}"
+        dir="$REPO_PATH"
         if ! git -C "$dir" rev-parse --git-dir >/dev/null 2>&1; then
           echo "::warning title=No git history::'$dir' is not a git repository. Files will be ranked by the import graph alone."
           exit 0
@@ -105,7 +111,7 @@ runs:
         if [ "$(git -C "$dir" rev-parse --is-shallow-repository)" != "true" ]; then
           exit 0
         fi
-        if [ "${{ inputs.fetch-history }}" != "true" ]; then
+        if [ "$FETCH_HISTORY" != "true" ]; then
           echo "::warning title=Shallow checkout::History was not fetched, so the churn signal is empty and ranking falls back to the import graph alone."
           exit 0
         fi
@@ -128,19 +134,24 @@ runs:
     - name: Resolve the diff base
       id: since
       shell: bash
+      env:
+        SINCE: ${{ inputs.since }}
+        REPO_PATH: ${{ inputs.path }}
+        EVENT_NAME: ${{ github.event_name }}
+        BASE_REF: ${{ github.event.pull_request.base.ref }}
       run: |
         set -uo pipefail
-        value="${{ inputs.since }}"
+        value="$SINCE"
         if [ "$value" = "auto" ]; then
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            value="origin/${{ github.event.pull_request.base.ref }}"
-            git -C "${{ inputs.path }}" fetch --quiet origin "${{ github.event.pull_request.base.ref }}" 2>/dev/null || true
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            value="origin/$BASE_REF"
+            git -C "$REPO_PATH" fetch --quiet origin "$BASE_REF" 2>/dev/null || true
           else
             echo "::notice::since=auto only applies to pull requests; showing the whole map."
             value=""
           fi
         fi
-        echo "ref=$value" >> "$GITHUB_OUTPUT"
+        printf 'ref=%s\n' "$value" >> "$GITHUB_OUTPUT"
 
     - name: Run foothold
       id: run
@@ -148,21 +159,26 @@ runs:
       env:
         # rich wraps to the terminal width; fix it so the summary is stable.
         COLUMNS: "110"
+        REPO_PATH: ${{ inputs.path }}
+        COMMAND: ${{ inputs.command }}
+        TOP: ${{ inputs.top }}
+        OUTPUT: ${{ inputs.output }}
+        SINCE_REF: ${{ steps.since.outputs.ref }}
       run: |
         set -euo pipefail
         out="${RUNNER_TEMP}/foothold-out.txt"
-        echo "FOOTHOLD_OUT=$out" >> "$GITHUB_ENV"
-        case "${{ inputs.command }}" in
+        printf 'FOOTHOLD_OUT=%s\n' "$out" >> "$GITHUB_ENV"
+        case "$COMMAND" in
           map)
-            if [ -n "${{ steps.since.outputs.ref }}" ]; then
-              foothold map "${{ inputs.path }}" --top "${{ inputs.top }}" --since "${{ steps.since.outputs.ref }}" | tee "$out"
+            if [ -n "$SINCE_REF" ]; then
+              foothold map "$REPO_PATH" --top "$TOP" --since "$SINCE_REF" | tee "$out"
             else
-              foothold map "${{ inputs.path }}" --top "${{ inputs.top }}" | tee "$out"
+              foothold map "$REPO_PATH" --top "$TOP" | tee "$out"
             fi
             ;;
-          issues) foothold issues "${{ inputs.path }}" --max "${{ inputs.top }}" --markdown | tee "$out" ;;
-          docs)   foothold docs   "${{ inputs.path }}" --out "${{ inputs.output }}" --top "${{ inputs.top }}" | tee "$out" ;;
-          *)      echo "::error::Unknown command '${{ inputs.command }}'. Use map, docs or issues."; exit 1 ;;
+          issues) foothold issues "$REPO_PATH" --max "$TOP" --markdown | tee "$out" ;;
+          docs)   foothold docs   "$REPO_PATH" --out "$OUTPUT" --top "$TOP" | tee "$out" ;;
+          *)      echo "::error::Unknown command '$COMMAND'. Use map, docs or issues."; exit 1 ;;
         esac
         {
           echo "result<<FOOTHOLD_EOF"
@@ -173,11 +189,13 @@ runs:
     - name: Write the job summary
       if: ${{ inputs.summary == 'true' }}
       shell: bash
+      env:
+        COMMAND: ${{ inputs.command }}
       run: |
         {
           echo "## Foothold"
           echo
-          if [ "${{ inputs.command }}" = "issues" ]; then
+          if [ "$COMMAND" = "issues" ]; then
             cat "$FOOTHOLD_OUT"
           else
             echo '```'
@@ -197,6 +215,7 @@ runs:
         GH_TOKEN: ${{ inputs.github-token }}
         REPO: ${{ github.repository }}
         PR_NUMBER: ${{ github.event.pull_request.number }}
+        COMMAND: ${{ inputs.command }}
       run: |
         set -uo pipefail
         marker='<!-- foothold-reading-path -->'
@@ -205,7 +224,7 @@ runs:
           echo "$marker"
           echo "## Foothold reading path"
           echo
-          if [ "${{ inputs.command }}" = "issues" ]; then
+          if [ "$COMMAND" = "issues" ]; then
             cat "$FOOTHOLD_OUT"
           else
             echo '```'
@@ -215,6 +234,18 @@ runs:
           echo
           echo "_Ranked by import graph and git churn._"
         } > "$body"
+
+        # GitHub rejects comments over 65,536 characters. Truncating with a
+        # visible note beats a 422 and no comment at all.
+        limit=60000
+        if [ "$(wc -c < "$body")" -gt "$limit" ]; then
+          head -c "$limit" "$body" > "$body.cut"
+          {
+            printf '\n```\n\n_Truncated to fit a GitHub comment. '
+            printf 'The full reading path is in the job summary._\n'
+          } >> "$body.cut"
+          mv "$body.cut" "$body"
+        fi
 
         existing=$(gh api "repos/$REPO/issues/$PR_NUMBER/comments" --paginate \
           --jq ".[] | select(.body | startswith(\"$marker\")) | .id" 2>/dev/null | head -1)

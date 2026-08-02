@@ -42,7 +42,7 @@ Or in CI, where every pull request gets the reading path as a comment:
 - uses: actions/checkout@v7
   with:
     fetch-depth: 0          # the churn signal needs real history
-- uses: serdairy/foothold@v0.2.0
+- uses: serdairy/foothold@v0.2.1
   with:
     comment: "true"         # needs permissions: pull-requests: write
 ```
@@ -101,7 +101,7 @@ permission:
 - uses: actions/checkout@v7
   with:
     fetch-depth: 0        # the churn signal needs real history
-- uses: serdairy/foothold@v0.2.0
+- uses: serdairy/foothold@v0.2.1
   with:
     top: "20"
 ```
@@ -115,7 +115,7 @@ permissions:
   pull-requests: write
 
 # ...
-      - uses: serdairy/foothold@v0.2.0
+      - uses: serdairy/foothold@v0.2.1
         with:
           comment: "true"
 ```
@@ -126,7 +126,7 @@ permissions:
 | `command` | `map` | `map`, `docs` or `issues` |
 | `top` | `20` | How many files to report |
 | `output` | `ARCHITECTURE.md` | File written when `command: docs` |
-| `version` | latest | Pin a foothold version, e.g. `0.2.0` |
+| `version` | latest | Pin a foothold version, e.g. `0.2.1` |
 | `summary` | `true` | Write the result to the job summary |
 | `since` | — | Scope to files changed since a ref; `auto` uses the PR base branch |
 | `comment` | `false` | Post the result as one pull request comment, edited in place |
@@ -177,7 +177,8 @@ what parsing yields, keyed by the SHA-256 of the file's bytes.
 
 The cache lives in `~/.cache/foothold` (or `$XDG_CACHE_HOME`, or
 `$FOOTHOLD_CACHE_DIR`), never inside the repository being read, so it cannot show
-up in someone else's `git status`. Only path-independent facts are stored — line
+up in someone else's `git status`. It is written `0600`, because it holds
+docstrings from whatever was analysed. Only path-independent facts are stored — line
 count, public definitions, docstring, raw import statements. Anything derived from
 where the file lives is recomputed every run, so a moved or renamed file cannot
 carry a stale answer with it.
@@ -248,6 +249,20 @@ release. It is deliberately not pinned by a CI equality check: churn is an input
 ranking moves as history accumulates, and a byte-for-byte assertion would fail on every
 commit. What CI does assert is that the generator runs against this repository on all
 twelve OS and Python combinations.
+
+## What it will not do
+
+Foothold reads repositories it has no reason to trust, so a few things are
+deliberate rather than accidental:
+
+- Parsing is stdlib `ast`. The analysed code is never imported or executed.
+- Files that resolve outside the analysed root are skipped, symlinks included. A
+  repository cannot use a symlink to pull an unrelated file into the output.
+- `git` is invoked with an explicit argv and no shell. Refs beginning with `-`
+  are refused, because git would read them as options rather than revisions.
+- Nothing leaves the machine unless you pass `--narrate` or run `explain`, and
+  `explain --dry-run` prints the exact payload first: paths, scores, docstring
+  first lines, never source.
 
 ## Limitations
 
