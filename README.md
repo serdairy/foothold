@@ -42,7 +42,7 @@ Or in CI, where every pull request gets the reading path as a comment:
 - uses: actions/checkout@v7
   with:
     fetch-depth: 0          # the churn signal needs real history
-- uses: serdairy/foothold@v0.2.1
+- uses: serdairy/foothold@v0.2.2
   with:
     comment: "true"         # needs permissions: pull-requests: write
 ```
@@ -101,7 +101,7 @@ permission:
 - uses: actions/checkout@v7
   with:
     fetch-depth: 0        # the churn signal needs real history
-- uses: serdairy/foothold@v0.2.1
+- uses: serdairy/foothold@v0.2.2
   with:
     top: "20"
 ```
@@ -115,7 +115,7 @@ permissions:
   pull-requests: write
 
 # ...
-      - uses: serdairy/foothold@v0.2.1
+      - uses: serdairy/foothold@v0.2.2
         with:
           comment: "true"
 ```
@@ -126,7 +126,7 @@ permissions:
 | `command` | `map` | `map`, `docs` or `issues` |
 | `top` | `20` | How many files to report |
 | `output` | `ARCHITECTURE.md` | File written when `command: docs` |
-| `version` | latest | Pin a foothold version, e.g. `0.2.1` |
+| `version` | latest | Pin a foothold version, e.g. `0.2.2` |
 | `summary` | `true` | Write the result to the job summary |
 | `since` | — | Scope to files changed since a ref; `auto` uses the PR base branch |
 | `comment` | `false` | Post the result as one pull request comment, edited in place |

@@ -86,11 +86,15 @@ def extract(source: str, filename: str) -> ParsedFile:
                     names=tuple(alias.name for alias in node.names),
                 )
             )
+    body = tree.body
+    if body and isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant):
+        body = body[1:]  # a lone docstring is not code
     return ParsedFile(
         loc=source.count("\n") + 1,
         defines=_public_defs(tree),
         docstring=ast.get_docstring(tree),
         imports=tuple(imports),
+        statements=len(body),
     )
 
 
@@ -119,6 +123,7 @@ def build_records(rel: str, parsed: ParsedFile) -> tuple[Module, list[Edge]]:
         is_package_init=Path(rel).name == "__init__.py",
         defines=parsed.defines,
         docstring=parsed.docstring,
+        statements=parsed.statements,
     )
     return module, edges
 

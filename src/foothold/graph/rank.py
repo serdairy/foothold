@@ -65,7 +65,11 @@ def rank(
     churn: dict[str, int],
     weights: Weights,
 ) -> list[Score]:
-    targets = [n for n in graph.nodes if not modules[n].is_test]
+    # Namespace-only package markers stay in the graph — transitive reach flows
+    # through them — but they are never an answer to "what should I read first".
+    targets = [
+        n for n in graph.nodes if not modules[n].is_test and not modules[n].is_namespace_only
+    ]
     if not targets:
         return []
     # Edges point importer -> imported, so PageRank on the graph as-built already

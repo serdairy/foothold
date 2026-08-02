@@ -16,6 +16,20 @@ class Module:
     is_package_init: bool
     defines: tuple[str, ...] = ()
     docstring: str | None = None
+    statements: int = 0
+
+    @property
+    def is_namespace_only(self) -> bool:
+        """A package marker with no code in it.
+
+        An empty ``__init__.py`` still carries transitive import weight, which is
+        how a zero-line file reached the top of codecarbon's map. It is a routing
+        node, not something a newcomer should be told to read.
+
+        A package marker holding only a docstring is kept: one sentence saying
+        what the package is for is exactly what someone arriving wants.
+        """
+        return self.is_package_init and self.statements == 0 and not self.docstring
 
 
 @dataclass

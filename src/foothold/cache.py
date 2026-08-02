@@ -23,7 +23,7 @@ from typing import Any
 
 # Bump when the stored shape or the parser's output changes. Old entries are
 # then ignored rather than misread, because the file name itself carries this.
-CACHE_FORMAT = 1
+CACHE_FORMAT = 2
 
 
 @dataclass(frozen=True)
@@ -64,6 +64,7 @@ class ParsedFile:
     defines: tuple[str, ...]
     docstring: str | None
     imports: tuple[RawImport, ...]
+    statements: int = 0
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -71,6 +72,7 @@ class ParsedFile:
             "defines": list(self.defines),
             "doc": self.docstring,
             "imports": [i.to_json() for i in self.imports],
+            "stmts": self.statements,
         }
 
     @staticmethod
@@ -80,6 +82,7 @@ class ParsedFile:
             defines=tuple(raw["defines"]),
             docstring=raw["doc"],
             imports=tuple(RawImport.from_json(i) for i in raw["imports"]),
+            statements=int(raw["stmts"]),
         )
 
 

@@ -6,6 +6,22 @@ All notable changes are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.2.2]
+
+### Fixed
+
+- An empty `__init__.py` could rank first. On codecarbon, a zero-line
+  `carbonserver/__init__.py` came top of 283 files: transitive import weight is
+  real, but a file with nothing in it is a routing node, not an answer to "what
+  should I read first". Package markers with no statements are now kept in the
+  graph and left out of the ranking. One holding only a docstring is still
+  ranked — a sentence saying what the package is for is worth reading.
+
+### Changed
+
+- `Module` records how many top-level statements a file has, and the cache format
+  is `2` so entries written by 0.2.1 are ignored rather than misread.
+
 ## [0.2.1]
 
 Findings from an audit of 0.2.0 against hostile and awkward repositories. Two of
