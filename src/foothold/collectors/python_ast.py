@@ -169,9 +169,7 @@ def build_records(rel: str, parsed: ParsedFile) -> tuple[Module, list[Edge]]:
             continue
         if target:
             edges.append(Edge(mod, target, imp.lineno, imp.kind))
-            edges.extend(
-                Edge(mod, f"{target}.{name}", imp.lineno, imp.kind) for name in imp.names
-            )
+            edges.extend(Edge(mod, f"{target}.{name}", imp.lineno, imp.kind) for name in imp.names)
         else:
             # ``from . import x`` anchored at the repository root
             edges.extend(Edge(mod, name, imp.lineno, imp.kind) for name in imp.names)
